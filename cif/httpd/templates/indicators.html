@@ -1,29 +1,84 @@
+
 {%- extends "layout.html" %}
 
 {% block content %}
-
-<table class="table table-striped" id="results">
+<div id="results_table">
+  <table id="search_results" class="display" style="width:100%">
     <thead>
+      <tr>
+        <th>ReportTime</th>
         <th>Group</th>
         <th>TLP</th>
         <th>Indicator</th>
-        <th>LastTime</th>
-        <th>ReportTime</th>
-        <th>Count</th>
-    </thead>
-    <tbody>
-     {% for r in records: %}
-      <tr>
-        <td>{{ r['group'] }}</td>
-        <td>{{ r['tlp'] }}</td>
-        <td>{{ r['indicator'] }}</td>
-        <td>{{ r['lasttime'] }}</td>
-        <td>{{ r['reporttime'] }}</td>
-        <td>{{ r['count'] }}</td>
+        <th>Provider</th>
+        <th>Tags</th>
+        <th>Confidence</th>
+        <th>Protocol</th>
+        <th>Portlist</th>
       </tr>
-    {% endfor %}
-    </tbody>
+    </thead>
+    <tfoot>
+      <tr>
+        <th>ReportTime</th>
+        <th>Group</th>
+        <th>TLP</th>
+        <th>Indicator</th>
+        <th>Provider</th>
+        <th>Tags</th>
+        <th>Confidence</th>
+        <th>Protocol</th>
+        <th>Portlist</th>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+<div id="export_buttons">
+</div>
+<script>
+function setupData() {
+    $(document).ready(function () {
+        var table = $('#search_results').DataTable({
+            "ajax": {
+                "url": "/u/indicators_get_data",
+                "dataType": "json",
+                "dataSrc": "data",
+                "contentType":"application/json"
+            },
+            "order": [[ 0, "desc" ]],
+            "dom": 'Bfrtip',
+            "buttons": [ 'colvis' ],
+            "columns": [
+                {"data": "reporttime", "defaultContent": ""},
+                {"data": "group", "defaultContent": ""},
+                {"data": "tlp", "defaultContent": ""},
+                {"data": "indicator", "defaultContent": ""},
+                {"data": "provider", "defaultContent": ""},
+                {"data": "tags", "defaultContent": ""},
+                {"data": "confidence", "defaultContent": ""},
+                {"data": "protocol", "defaultContent": ""},
+                {"data": "portlist", "defaultContent": ""}
+            ]
+        });
 
-</table>
+        new $.fn.dataTable.Buttons( table, {
+            buttons: [ 'csvHtml5',
+                {
+                    text: 'JSON',
+                    action: function (e, dt, button, config) {
+                        var data = dt.buttons.exportData();
 
+                        $.fn.dataTable.fileSave(
+                            new Blob([JSON.stringify(data)]),
+                            'Export.json'
+                        );
+                    }
+                }
+            ]
+        });
+
+        table.buttons( 1, null ).container().appendTo('#export_buttons');
+    });
+}
+$( window ).on( "load", setupData );
+</script>
 {% endblock %}

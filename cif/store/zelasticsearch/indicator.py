@@ -37,6 +37,7 @@ class IndicatorManager(IndicatorManagerPlugin):
         self.partition = PARTITION
         self.idx = self._current_index()
         self.last_index_check = datetime.now() - timedelta(minutes=5)
+        self.last_index_value = None
         self.handle = connections.get_connection()
         self.lockm = LockManager(self.handle, logger)
 
@@ -63,11 +64,12 @@ class IndicatorManager(IndicatorManagerPlugin):
     def _create_index(self):
         # https://github.com/csirtgadgets/massive-octo-spice/blob/develop/elasticsearch/observables.json
         # http://elasticsearch-py.readthedocs.org/en/master/api.html#elasticsearch.Elasticsearch.bulk
-        idx = self._current_index()
 
         # every time we check it does a HEAD req
-        if (datetime.utcnow() - self.last_index_check) < timedelta(minutes=2):
-            return idx
+        if self.last_index_value and (datetime.utcnow() - self.last_index_check) < timedelta(minutes=2):
+            return self.last_index_value
+
+        idx = self._current_index()
 
         if not self.handle.indices.exists(idx):
             index = Index(idx)
@@ -78,6 +80,7 @@ class IndicatorManager(IndicatorManagerPlugin):
             self.handle.indices.flush(idx)
 
         self.last_index_check = datetime.utcnow()
+        self.last_index_value = idx
         return idx
 
     def search(self, token, filters, sort='reporttime', raw=False, timeout=TIMEOUT):
@@ -163,7 +166,12 @@ class IndicatorManager(IndicatorManagerPlugin):
             ii = self.create(token, i, bulk=True)
             actions.append(ii)
 
-        helpers.bulk(self.handle, actions, index=self._current_index())
+        try:
+            helpers.bulk(self.handle, actions, index=self._current_index())
+
+        except Exception as e:
+            logger.error(e)
+            actions = []
 
         if flush:
             self.flush()
@@ -292,4 +300,3 @@ class IndicatorManager(IndicatorManagerPlugin):
 
         #self.lockm.lock_release()
         return count
-

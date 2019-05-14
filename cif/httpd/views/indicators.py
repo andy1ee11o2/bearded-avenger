@@ -28,13 +28,25 @@ class IndicatorsAPI(MethodView):
 
         if request.args.get('q'):
             filters['indicator'] = request.args.get('q')
+        if request.args.get('confidence'):
+            filters['confidence'] = request.args.get('confidence')
+        if request.args.get('provider'):
+            filters['provider'] = request.args.get('provider')
+        if request.args.get('group'):
+            filters['group'] = request.args.get('group')
+        if request.args.get('tags'):
+            filters['tags'] = request.args.get('tags')
+        if request.args.get('lasttime'):
+            filters['lasttime'] = request.args.get('lasttime')
 
         if current_app.config.get('dummy'):
             r = DummyClient(remote, pull_token()).indicators_search(filters)
             return jsonify_success(r)
 
         try:
-            r = Client(remote, pull_token()).indicators_search(filters, decode=False)
+            with Client(remote, pull_token()) as cli:
+                r = cli.indicators_search(filters, decode=False)
+
         except RuntimeError as e:
             logger.error(e)
             return jsonify_unknown(msg='search failed')
@@ -68,7 +80,9 @@ class IndicatorsAPI(MethodView):
                 logger.info('fireball mode')
                 fireball = True
         try:
-            r = Client(remote, pull_token()).indicators_create(request.data, nowait=nowait, fireball=fireball)
+            with Client(remote, pull_token()) as cli:
+                r = cli.indicators_create(request.data, nowait=nowait,
+                                          fireball=fireball)
             if nowait:
                 r = 'pending'
 
@@ -99,7 +113,8 @@ class IndicatorsAPI(MethodView):
     def delete(self):
         try:
             data = request.data.decode('utf-8')
-            r = Client(remote, pull_token()).indicators_delete(data)
+            with Client(remote, pull_token()) as cli:
+                r = cli.indicators_delete(data)
 
         except RuntimeError as e:
             logger.error(e)

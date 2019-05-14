@@ -1,9 +1,10 @@
-from elasticsearch_dsl import DocType, String, Date, Integer, Boolean, Float, Ip, GeoPoint
+from elasticsearch_dsl import DocType, String, Date, Integer, Boolean, Float, Ip, GeoPoint, Keyword, Index
 import elasticsearch.exceptions
 from elasticsearch_dsl.connections import connections
 import arrow
 from pprint import pprint
 import logging
+from .constants import LIMIT, TIMEOUT
 from cif.constants import PYVERSION
 from cif.store.token_plugin import TokenManagerPlugin
 import os
@@ -15,15 +16,23 @@ CONFLICT_RETRIES = os.getenv('CIF_STORE_ES_CONFLICT_RETRIES', 5)
 CONFLICT_RETRIES = int(CONFLICT_RETRIES)
 
 
+class ReIndexError(Exception):
+    def __init__(self, value):
+        self.value = value
+        
+    def __str__(self):
+        return repr(self.value)
+
+
 class Token(DocType):
-    username = String()
-    token = String()
+    username = Keyword()
+    token = Keyword()
     expires = Date()
     read = Boolean()
     write = Boolean()
     revoked = Boolean()
-    acl = String()
-    groups = String()
+    acl = Keyword()
+    groups = Keyword()
     admin = Boolean()
     last_activity_at = Date()
 
@@ -33,10 +42,18 @@ class Token(DocType):
 
 class TokenManager(TokenManagerPlugin):
     def __init__(self, *args, **kwargs):
+        try:
+            Token.init()
+        except elasticsearch.exceptions.RequestError:
+            raise ReIndexError("Your Tokens index is using an old mapping, please run reindex_tokens.py")
+        except Exception as e:
+            raise ReIndexError("Unspecified error: %s" % e)
+
         super(TokenManager, self).__init__(**kwargs)
 
     def search(self, data, raw=False):
         s = Token.search()
+        s = s.params(size=LIMIT, timeout=TIMEOUT)
 
         for k in ['token', 'username', 'admin', 'write', 'read']:
             if data.get(k):
@@ -84,7 +101,7 @@ class TokenManager(TokenManagerPlugin):
         if not (data.get('token') or data.get('username')):
             return 'username or token required'
 
-        rv = self.search(data, raw=True)
+        rv = list(self.search(data, raw=True))
 
         if not rv:
             return 0
@@ -94,18 +111,28 @@ class TokenManager(TokenManagerPlugin):
             t.delete()
 
         connections.get_connection().indices.flush(index='tokens')
-        return len(list(rv))
+        return len(rv)
 
     def edit(self, data):
         if not data.get('token'):
             return 'token required for updating'
 
-        d = list(self.search({'token': data['token']}))
+        d = list(self.search({'token': data['token']}, raw=True))
         if not d:
             return 'token not found'
 
-        d.update(fields=data)
+        d = Token.get(d[0]['_id'])
+
+        try:
+            d.update(groups=data['groups'])
+
+        except Exception as e:
+            import traceback
+            logger.error(traceback.print_exc())
+            return False
+
         connections.get_connection().indices.flush(index='tokens')
+        return True
 
     def update_last_activity_at(self, token, timestamp):
         if isinstance(timestamp, str):

@@ -11,32 +11,37 @@
     {%- endblock metas %}
 
     {%- block styles %}
-    <!-- Bootstrap -->
-    <link href="{{bootstrap_find_resource('css/bootstrap.css', cdn='bootstrap')}}" rel="stylesheet">
+        <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/jquery.dataTables.min.css"/>
+        <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/bs-3.3.7/jq-3.3.1/dt-1.10.18/b-1.5.6/b-colvis-1.5.6/b-html5-1.5.6/datatables.min.css"/>
+        <script type="text/javascript" src="https://cdn.datatables.net/v/bs-3.3.7/jq-3.3.1/dt-1.10.18/b-1.5.6/b-colvis-1.5.6/b-html5-1.5.6/datatables.min.js"></script>
     {%- endblock styles %}
     {%- endblock head %}
   </head>
   <body{% block body_attribs %}{% endblock body_attribs %}>
     {% block body -%}
-    {% block navbar %}
-    {%- endblock navbar %}
+
+    <div id="navbar">
+      {% block navbar %}
+      {%- endblock navbar %}
+    </div>
 
     <div class="row">
       <div class="col-md-1"></div>
       <div class="col-md-10">
-          {% block content -%}
-      {%- endblock content %}
+        {% block content -%}
+        {%- endblock content %}
       </div>
       <div class="col-md-1"></div>
     </div>
 
 
     {% block scripts %}
-    <script src="{{bootstrap_find_resource('jquery.js', cdn='jquery')}}"></script>
-    <script src="{{bootstrap_find_resource('js/bootstrap.js', cdn='bootstrap')}}"></script>
     {%- endblock scripts %}
+
     {%- endblock body %}
   </body>
 {%- endblock html %}
+
 </html>
 {% endblock doc -%}
+
